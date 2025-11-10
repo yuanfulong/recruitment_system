@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+env/
+venv/
+
+# PyCharm
+.idea/
+*.iml
+
+# Others
+.DS_Store
+*.log

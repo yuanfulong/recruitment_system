@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能招聘助手系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; }
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .hover-lift { transition: all 0.2s; }
+        .hover-lift:hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(0,0,0,0.15); }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-50">
+    <div id="app"></div>
+
+    <script>
+        // ==================== API 配置 ====================
+       const API_URL = window.location.origin;
+
+        // 配置 axios 跨域
+        axios.defaults.headers.common['Access-Control-Allow-Origin'] = '*';
+
+        // ==================== 应用状态 ====================
+        let appState = {
+            currentPage: 'dashboard',
+            positions: [],
+            candidates: [],
+            selectedCandidate: null,
+            selectedPosition: null,
+            queryResult: null,
+            loading: false,
+            message: null,
+        };
+
+        // ==================== API 调用 ====================
+
+        async function fetchPositions() {
+            try {
+                const response = await axios.get(`${API_URL}/api/positions`);
+                appState.positions = response.data.positions || [];
+                render();
+            } catch (error) {
+                showMessage('获取岗位列表失败: ' + error.message, 'error');
+            }
+        }
+
+        async function fetchCandidates() {
+            try {
+                const response = await axios.get(`${API_URL}/api/candidates?limit=100`);
+                appState.candidates = response.data.candidates || [];
+                render();
+            } catch (error) {
+                showMessage('获取候选人列表失败: ' + error.message, 'error');
+            }
+        }
+
+        async function getCandidateDetail(id) {
+            try {
+                const response = await axios.get(`${API_URL}/api/candidates/${id}`);
+                appState.selectedCandidate = response.data;
+                appState.currentPage = 'candidateDetail';
+                render();
+            } catch (error) {
+                showMessage('获取候选人详情失败: ' + error.message, 'error');
+            }
+        }
+
+        async function getPositionCandidates(positionId) {
+            try {
+                const response = await axios.get(`${API_URL}/api/positions/${positionId}/candidates?min_grade=C`);
+                appState.selectedPosition = response.data;
+                appState.currentPage = 'positionDetail';
+                render();
+            } catch (error) {
+                showMessage('获取岗位候选人失败: ' + error.message, 'error');
+            }
+        }
+
+        async function uploadResume(file) {
+            try {
+                appState.loading = true;
+                render();
+
+                showMessage('📤 正在上传文件...', 'info');
+                await new Promise(r => setTimeout(r, 500));
+
+                const formData = new FormData();
+                formData.append('file', file);
+
+                showMessage('🔄 正在提取简历信息...', 'info');
+                const response = await axios.post(`${API_URL}/api/candidates/upload`, formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+
+                if (response.data.status === 'error') {
+                    showMessage(`❌ 上传失败: ${response.data.message}`, 'error');
+                    appState.loading = false;
+                    render();
+                    return;
+                }
+
+                showMessage(`✅ 简历已上传！${response.data.name} 被分配到 ${response.data.auto_matched_position} 岗位`, 'success');
+                await new Promise(r => setTimeout(r, 2000));
+                await fetchCandidates();
+                appState.currentPage = 'dashboard';
+            } catch (error) {
+                showMessage('❌ 上传简历失败: ' + (error.response?.data?.detail || error.message), 'error');
+            } finally {
+                appState.loading = false;
+                render();
+            }
+        }
+
+        async function createPosition(name, description) {
+            try {
+                appState.loading = true;
+                render();
+
+                showMessage('🔄 正在创建岗位...', 'info');
+                await new Promise(r => setTimeout(r, 500));
+
+                const response = await axios.post(`${API_URL}/api/positions`, {
+                    name,
+                    description,
+                    required_skills: [],
+                    nice_to_have: []
+                });
+
+                if (response.data.status === 'error') {
+                    showMessage(`❌ 创建失败: ${response.data.message}`, 'error');
+                    appState.loading = false;
+                    render();
+                    return;
+                }
+
+                showMessage(`✅ 岗位 "${name}" 创建成功！正在进行候选人重新分配...`, 'success');
+                await new Promise(r => setTimeout(r, 1500));
+                await fetchPositions();
+                appState.currentPage = 'dashboard';
+            } catch (error) {
+                showMessage('❌ 创建岗位失败: ' + (error.response?.data?.detail || error.message), 'error');
+            } finally {
+                appState.loading = false;
+                render();
+            }
+        }
+
+        async function queryByNaturalLanguage(query) {
+            try {
+                appState.loading = true;
+                render();
+
+                showMessage('🔍 正在理解查询...', 'info');
+                await new Promise(r => setTimeout(r, 500));
+
+                const response = await axios.post(`${API_URL}/api/query`, { query });
+
+                if (response.data.error) {
+                    showMessage(`❌ 查询失败: ${response.data.error}`, 'error');
+                    appState.loading = false;
+                    render();
+                    return;
+                }
+
+                appState.queryResult = response.data;
+                appState.currentPage = 'queryResult';
+                showMessage(`✅ 查询完成！找到 ${response.data.total} 条结果`, 'success');
+                render();
+            } catch (error) {
+                showMessage('❌ 查询失败: ' + (error.response?.data?.detail || error.message), 'error');
+            } finally {
+                appState.loading = false;
+            }
+        }
+
+        // ==================== 消息显示 ====================
+
+        function showMessage(msg, type = 'info') {
+            appState.message = { text: msg, type };
+            render();
+            setTimeout(() => {
+                appState.message = null;
+                render();
+            }, 4000);
+        }
+
+        // ==================== 页面组件 ====================
+
+        function TopBar() {
+            return `
+                <div class="bg-white border-b border-gray-200 shadow-sm">
+                    <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+                        <div class="flex items-center cursor-pointer" onclick="appState.currentPage='dashboard'; render();">
+                            <i class="fas fa-robot text-2xl text-blue-600 mr-3"></i>
+                            <h1 class="text-2xl font-bold text-gray-900">智能招聘助手</h1>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="appState.currentPage='dashboard'; render();"
+                                class="px-4 py-2 rounded-lg font-semibold transition ${appState.currentPage === 'dashboard' ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-100'}">
+                                <i class="fas fa-home mr-2"></i>首页
+                            </button>
+                            <button onclick="fetchPositions(); fetchCandidates();"
+                                class="px-4 py-2 rounded-lg font-semibold text-gray-700 hover:bg-gray-100 transition">
+                                <i class="fas fa-sync mr-2"></i>刷新
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function MessageBox() {
+            if (!appState.message) return '';
+
+            const bgColor = appState.message.type === 'success' ? 'bg-green-100 border-green-400 text-green-800' :
+                           appState.message.type === 'error' ? 'bg-red-100 border-red-400 text-red-800' :
+                           'bg-blue-100 border-blue-400 text-blue-800';
+
+            const icon = appState.message.type === 'success' ? 'check-circle' :
+                        appState.message.type === 'error' ? 'exclamation-circle' :
+                        'info-circle';
+
+            return `
+                <div class="fixed top-20 right-4 p-4 rounded-lg border ${bgColor} shadow-lg fade-in z-50 max-w-sm">
+                    <div class="flex items-center">
+                        <i class="fas fa-${icon} mr-3"></i>
+                        <span>${appState.message.text}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ==================== 首页 ====================
+
+        function DashboardPage() {
+            return `
+                <div class="max-w-7xl mx-auto px-4 py-8">
+                    <div class="mb-8">
+                        <h2 class="text-3xl font-bold text-gray-900 mb-2">📊 数据概览</h2>
+                        <p class="text-gray-600">实时查看招聘系统的运营数据</p>
+                    </div>
+
+                    <!-- 统计卡片 -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                        <div class="bg-white rounded-lg shadow p-6 hover-lift">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-gray-600 text-sm mb-1">活跃岗位</p>
+                                    <p class="text-3xl font-bold text-blue-600">${appState.positions.length}</p>
+                                </div>
+                                <i class="fas fa-briefcase text-4xl text-blue-100"></i>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-lg shadow p-6 hover-lift">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-gray-600 text-sm mb-1">候选人总数</p>
+                                    <p class="text-3xl font-bold text-green-600">${appState.candidates.length}</p>
+                                </div>
+                                <i class="fas fa-users text-4xl text-green-100"></i>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-lg shadow p-6 hover-lift">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-gray-600 text-sm mb-1">A级候选人</p>
+                                    <p class="text-3xl font-bold text-purple-600">${appState.candidates.filter(c => c.auto_matched_score >= 86).length}</p>
+                                </div>
+                                <i class="fas fa-star text-4xl text-purple-100"></i>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-lg shadow p-6 hover-lift">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-gray-600 text-sm mb-1">匹配成功率</p>
+                                    <p class="text-3xl font-bold text-orange-600">${appState.candidates.length > 0 ? Math.round(appState.candidates.filter(c => c.auto_matched_score > 60).length / appState.candidates.length * 100) : 0}%</p>
+                                </div>
+                                <i class="fas fa-chart-line text-4xl text-orange-100"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 快速操作 -->
+                    <div class="bg-white rounded-lg shadow p-8 mb-8">
+                        <h3 class="text-2xl font-bold text-gray-900 mb-6">🚀 快速操作</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <button onclick="appState.currentPage='uploadResume'; render();"
+                                class="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-4 rounded-lg font-bold hover:shadow-lg transition flex items-center justify-center text-lg">
+                                <i class="fas fa-upload mr-3"></i> 上传简历
+                            </button>
+                            <button onclick="appState.currentPage='createPosition'; render();"
+                                class="bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-4 rounded-lg font-bold hover:shadow-lg transition flex items-center justify-center text-lg">
+                                <i class="fas fa-plus mr-3"></i> 创建岗位
+                            </button>
+                            <button onclick="appState.currentPage='queryPage'; render();"
+                                class="bg-gradient-to-r from-purple-600 to-purple-700 text-white px-6 py-4 rounded-lg font-bold hover:shadow-lg transition flex items-center justify-center text-lg">
+                                <i class="fas fa-search mr-3"></i> 智能查询
+                            </button>
+                            <button onclick="appState.currentPage='candidates'; render();"
+                                class="bg-gradient-to-r from-orange-600 to-orange-700 text-white px-6 py-4 rounded-lg font-bold hover:shadow-lg transition flex items-center justify-center text-lg">
+                                <i class="fas fa-list mr-3"></i> 查看候选人
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 岗位列表 -->
+                    <div class="bg-white rounded-lg shadow p-8">
+                        <h3 class="text-2xl font-bold text-gray-900 mb-6">📋 岗位一览</h3>
+                        ${appState.positions.length === 0 ?
+                            '<p class="text-gray-500 text-center py-8">暂无岗位，请创建新岗位</p>' :
+                            `<div class="grid gap-4">
+                                ${appState.positions.map(pos => `
+                                    <div class="border border-gray-200 rounded-lg p-6 hover-lift cursor-pointer" onclick="getPositionCandidates(${pos.position_id})">
+                                        <div class="flex justify-between items-start mb-3">
+                                            <h4 class="text-lg font-bold text-gray-900">${pos.name}</h4>
+                                            <span class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-bold">${pos.total_candidates}人</span>
+                                        </div>
+                                        <p class="text-gray-600 text-sm mb-3">${pos.description.substring(0, 100) || '暂无描述'}...</p>
+                                        <div class="flex gap-2 text-xs text-gray-500">
+                                            <span class="px-2 py-1 bg-gray-100 rounded">A级: ${pos.grade_distribution?.A || 0}</span>
+                                            <span class="px-2 py-1 bg-gray-100 rounded">B级: ${pos.grade_distribution?.B || 0}</span>
+                                            <span class="px-2 py-1 bg-gray-100 rounded">C级: ${pos.grade_distribution?.C || 0}</span>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>`
+                        }
+                    </div>
+                </div>
+            `;
+        }
+
+        // ==================== 上传简历页 ====================
+
+        function UploadResumePage() {
+            return `
+                <div class="max-w-2xl mx-auto px-4 py-8">
+                    <div class="flex items-center gap-4 mb-8">
+                        <button onclick="appState.currentPage='dashboard'; render();" class="text-blue-600 hover:text-blue-800 text-2xl">
+                            <i class="fas fa-arrow-left"></i>
+                        </button>
+                        <h2 class="text-3xl font-bold text-gray-900">📄 上传简历</h2>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow p-8">
+                        <div class="border-4 border-dashed border-blue-300 rounded-lg p-12 text-center hover:bg-blue-50 transition cursor-pointer"
+                             id="dropZone" onclick="if(!appState.loading) document.getElementById('fileInput').click();">
+                            <i class="fas fa-cloud-upload-alt text-6xl mb-4 ${appState.loading ? 'fa-spin text-gray-400' : 'text-blue-600'}"></i>
+                            <p class="text-xl text-gray-900 font-bold mb-2">${appState.loading ? '处理中...' : '拖拽 PDF 简历或点击选择'}</p>
+                            <p class="text-gray-600">支持PDF格式，单个文件最大 10MB</p>
+                            <input type="file" id="fileInput" accept=".pdf" style="display:none;" ${appState.loading ? 'disabled' : ''}
+                                   onchange="if(this.files[0] && !appState.loading) uploadResume(this.files[0]);">
+                        </div>
+
+                        <div class="mt-8 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-600 rounded-lg">
+                            <p class="text-gray-900 font-bold mb-3">✨ 系统会自动：</p>
+                            <ul class="text-gray-700 space-y-2">
+                                <li>✓ 提取简历中的个人信息、技能和工作经历</li>
+                                <li>✓ 分析求职意向和职位匹配需求</li>
+                                <li>✓ 对所有开放岗位进行智能评分</li>
+                                <li>✓ 推荐最匹配的岗位</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ==================== 创建岗位页 ====================
+
+        function CreatePositionPage() {
+            return `
+                <div class="max-w-2xl mx-auto px-4 py-8">
+                    <div class="flex items-center gap-4 mb-8">
+                        <button onclick="appState.currentPage='dashboard'; render();" class="text-blue-600 hover:text-blue-800 text-2xl">
+                            <i class="fas fa-arrow-left"></i>
+                        </button>
+                        <h2 class="text-3xl font-bold text-gray-900">➕ 创建新岗位</h2>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow p-8">
+                        <form onsubmit="event.preventDefault();
+                                 const name = document.getElementById('posName').value;
+                                 const desc = document.getElementById('posDesc').value;
+                                 if(name && desc) createPosition(name, desc);">
+
+                            <div class="mb-6">
+                                <label class="block text-gray-700 font-bold mb-3 text-lg">岗位名称 *</label>
+                                <input type="text" id="posName" required
+                                    class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-600 transition text-lg"
+                                    placeholder="例如：高级Python开发工程师">
+                            </div>
+
+                            <div class="mb-6">
+                                <label class="block text-gray-700 font-bold mb-3 text-lg">岗位描述 *</label>
+                                <textarea id="posDesc" required rows="6"
+                                    class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-600 transition text-lg"
+                                    placeholder="详细描述岗位的职责、要求、薪资范围等..."></textarea>
+                                <p class="text-gray-600 text-sm mt-2">描述越详细，匹配越准确</p>
+                            </div>
+
+                            <button type="submit" class="w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-3 rounded-lg font-bold text-lg hover:shadow-lg transition"
+                                    ${appState.loading ? 'disabled opacity-50' : ''}>
+                                ${appState.loading ? '<i class="fas fa-spinner fa-spin mr-2"></i>处理中...' : '<i class="fas fa-check mr-2"></i>创建岗位'}
+                            </button>
+                        </form>
+
+                        <div class="mt-8 p-6 bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-green-600 rounded-lg">
+                            <p class="text-gray-900 font-bold mb-2">🎯 新岗位创建后会自动：</p>
+                            <ul class="text-gray-700 space-y-1 text-sm">
+                                <li>✓ 扫描所有候选人简历</li>
+                                <li>✓ 使用AI评估匹配度</li>
+                                <li>✓ 自动重新分配更优岗位</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ==================== 智能查询页 ====================
+
+        function QueryPage() {
+            return `
+                <div class="max-w-2xl mx-auto px-4 py-8">
+                    <div class="flex items-center gap-4 mb-8">
+                        <button onclick="appState.currentPage='dashboard'; render();" class="text-blue-600 hover:text-blue-800 text-2xl">
+                            <i class="fas fa-arrow-left"></i>
+                        </button>
+                        <h2 class="text-3xl font-bold text-gray-900">🔍 智能查询</h2>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow p-8">
+                        <form onsubmit="event.preventDefault();
+                                 const query = document.getElementById('queryInput').value;
+                                 if(query) queryByNaturalLanguage(query);">
+
+                            <div class="mb-6">
+                                <label class="block text-gray-700 font-bold mb-3 text-lg">用中文提问 *</label>
+                                <textarea id="queryInput" required rows="4"
+                                    class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-600 transition text-lg"
+                                    placeholder="例如：&#10;• 给我所有Python岗位的A级候选人&#10;• 统计各等级候选人的数量&#10;• 哪些候选人有明确的求职意向"></textarea>
+                            </div>
+
+                            <button type="submit" class="w-full bg-gradient-to-r from-purple-600 to-purple-700 text-white py-3 rounded-lg font-bold text-lg hover:shadow-lg transition"
+                                    ${appState.loading ? 'disabled opacity-50' : ''}>
+                                ${appState.loading ? '<i class="fas fa-spinner fa-spin mr-2"></i>查询中...' : '<i class="fas fa-search mr-2"></i>查询'}
+                            </button>
+                        </form>
+
+                        <div class="mt-8 grid grid-cols-2 gap-4">
+                            <div class="p-4 bg-purple-50 border-l-4 border-purple-600 rounded-lg">
+                                <p class="font-bold text-gray-900 mb-2">📌 查询示例</p>
+                                <ul class="text-sm text-gray-700 space-y-1">
+                                    <li>• Python岗位的候选人</li>
+                                    <li>• A级以上候选人</li>
+                                    <li>• 总人数统计</li>
+                                </ul>
+                            </div>
+                            <div class="p-4 bg-purple-50 border-l-4 border-purple-600 rounded-lg">
+                                <p class="font-bold text-gray-900 mb-2">💡 提示</p>
+                                <ul class="text-sm text-gray-700 space-y-1">
+                                    <li>• 支持自然语言</li>
+                                    <li>• AI智能理解</li>
+                                    <li>• 实时数据分析</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ==================== 候选人列表页 ====================
+
+        function CandidatesPage() {
+            return `
+                <div class="max-w-6xl mx-auto px-4 py-8">
+                    <div class="flex items-center gap-4 mb-8">
+                        <button onclick="appState.currentPage='dashboard'; render();" class="text-blue-600 hover:text-blue-800 text-2xl">
+                            <i class="fas fa-arrow-left"></i>
+                        </button>
+                        <h2 class="text-3xl font-bold text-gray-900">👥 候选人列表</h2>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow overflow-hidden">
+                        ${appState.candidates.length === 0 ?
+                            '<p class="text-gray-500 text-center py-12 text-lg">暂无候选人</p>' :
+                            `<div class="overflow-x-auto">
+                                <table class="w-full">
+                                    <thead class="bg-gradient-to-r from-gray-100 to-gray-50">
+                                        <tr class="border-b-2 border-gray-200">
+                                            <th class="px-6 py-4 text-left text-gray-900 font-bold">姓名</th>
+                                            <th class="px-6 py-4 text-left text-gray-900 font-bold">年龄</th>
+                                            <th class="px-6 py-4 text-left text-gray-900 font-bold">分配岗位</th>
+                                            <th class="px-6 py-4 text-center text-gray-900 font-bold">评分</th>
+                                            <th class="px-6 py-4 text-center text-gray-900 font-bold">状态</th>
+                                            <th class="px-6 py-4 text-center text-gray-900 font-bold">操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${appState.candidates.map((candidate, idx) => `
+                                            <tr class="border-b hover:bg-blue-50 transition ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}">
+                                                <td class="px-6 py-4 text-gray-900 font-semibold">${candidate.name}</td>
+                                                <td class="px-6 py-4 text-gray-600">${candidate.age || '-'}</td>
+                                                <td class="px-6 py-4 text-gray-600">${candidate.auto_matched_position || '-'}</td>
+                                                <td class="px-6 py-4 text-center">
+                                                    <span class="inline-block px-3 py-1 rounded-full text-sm font-bold
+                                                        ${candidate.auto_matched_score >= 86 ? 'bg-green-100 text-green-800' :
+                                                          candidate.auto_matched_score >= 76 ? 'bg-blue-100 text-blue-800' :
+                                                          candidate.auto_matched_score >= 60 ? 'bg-yellow-100 text-yellow-800' :
+                                                          'bg-red-100 text-red-800'}">
+                                                        ${candidate.auto_matched_score || 0}
+                                                    </span>
+                                                </td>
+                                                <td class="px-6 py-4 text-center">
+                                                    ${candidate.is_position_locked ?
+                                                        '<span class="inline-block text-xs px-2 py-1 bg-purple-100 text-purple-800 rounded font-semibold">🔒 已锁定</span>' :
+                                                        candidate.no_matched_position ?
+                                                        '<span class="inline-block text-xs px-2 py-1 bg-orange-100 text-orange-800 rounded font-semibold">⏳ 待匹配</span>' :
+                                                        '<span class="inline-block text-xs px-2 py-1 bg-green-100 text-green-800 rounded font-semibold">✓ 正常</span>'}
+                                                </td>
+                                                <td class="px-6 py-4 text-center">
+                                                    <button onclick="getCandidateDetail(${candidate.candidate_id})"
+                                                        class="text-blue-600 hover:text-blue-800 font-semibold hover:underline">
+                                                        查看详情
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>`
+                        }
+                    </div>
+                </div>
+            `;
+        }
+
+        // ==================== 候选人详情页 ====================
+
+        function CandidateDetailPage() {
+            const c = appState.selectedCandidate;
+            return `
+                <div class="max-w-4xl mx-auto px-4 py-8">
+                    <div class="flex items-center gap-4 mb-8">
+                        <button onclick="appState.currentPage='candidates'; render();" class="text-blue-600 hover:text-blue-800 text-2xl">
+                            <i class="fas fa-arrow-left"></i>
+                        </button>
+                        <h2 class="text-3xl font-bold text-gray-900">候选人详情</h2>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow p-8">
+                        <div class="flex justify-between items-start mb-8 pb-8 border-b-2">
+                            <div>
+                                <h1 class="text-4xl font-bold text-gray-900 mb-2">${c.name}</h1>
+                                <p class="text-gray-600 text-lg mb-4">${c.email || '未提供'} | ${c.phone || '未提供'}</p>
+                                <div class="flex gap-4">
+                                    <span class="px-4 py-2 bg-gray-100 text-gray-900 rounded-lg font-semibold">年龄: ${c.age || '-'}</span>
+                                    <span class="px-4 py-2 bg-blue-100 text-blue-900 rounded-lg font-semibold">质量: ${(c.extraction_quality || 0).toFixed(0)}%</span>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-6xl font-bold text-blue-600">${c.auto_matched_position_score || c.auto_matched_score || 0}</p>
+                                <p class="text-gray-600 text-lg">综合评分</p>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-3 gap-4 mb-8 p-6 bg-gray-50 rounded-lg">
+                            <div>
+                                <p class="text-gray-600 text-sm mb-1">分配岗位</p>
+                                <p class="text-xl font-bold text-gray-900">${c.auto_matched_position || '未分配'}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-600 text-sm mb-1">求职意向</p>
+                                <p class="text-xl font-bold text-gray-900">${c.explicit_position || '无'}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-600 text-sm mb-1">岗位状态</p>
+                                <p class="text-xl font-bold text-gray-900">
+                                    ${c.is_position_locked ? '🔒 已锁定' : c.no_matched_position ? '⏳ 待匹配' : '✓ 正常'}
+                                </p>
+                            </div>
+                        </div>
+
+                        <h3 class="text-2xl font-bold text-gray-900 mb-6">各岗位匹配度评分</h3>
+                        <div class="space-y-4">
+                            ${c.positions.map(pos => `
+                                <div class="p-4 border-2 border-gray-200 rounded-lg hover:border-blue-400 transition">
+                                    <div class="flex justify-between items-center mb-3">
+                                        <div>
+                                            <p class="font-bold text-gray-900 text-lg">${pos.position_name}</p>
+                                            <p class="text-sm text-gray-600">等级: ${pos.grade}</p>
+                                        </div>
+                                        <span class="text-2xl font-bold text-blue-600">${pos.score}/100</span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                                        <div class="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full" style="width: ${Math.min(pos.score, 100)}%"></div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ==================== 岗位详情页 ====================
+
+        function PositionDetailPage() {
+            const p = appState.selectedPosition;
+            return `
+                <div class="max-w-4xl mx-auto px-4 py-8">
+                    <div class="flex items-center gap-4 mb-8">
+                        <button onclick="appState.currentPage='dashboard'; render();" class="text-blue-600 hover:text-blue-800 text-2xl">
+                            <i class="fas fa-arrow-left"></i>
+                        </button>
+                        <h2 class="text-3xl font-bold text-gray-900">岗位详情</h2>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow p-8 mb-8">
+                        <h1 class="text-4xl font-bold text-gray-900 mb-4">${p.position_name}</h1>
+                        <div class="flex gap-4 flex-wrap">
+                            <span class="px-4 py-2 bg-blue-100 text-blue-900 rounded-lg font-bold">候选人: ${p.total_candidates}位</span>
+                            <span class="px-4 py-2 bg-green-100 text-green-900 rounded-lg font-bold">A级: ${p.candidates.filter(c => c.grade === 'A').length}位</span>
+                            <span class="px-4 py-2 bg-yellow-100 text-yellow-900 rounded-lg font-bold">B级: ${p.candidates.filter(c => c.grade === 'B').length}位</span>
+                            <span class="px-4 py-2 bg-orange-100 text-orange-900 rounded-lg font-bold">C级: ${p.candidates.filter(c => c.grade === 'C').length}位</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow p-8">
+                        <h2 class="text-2xl font-bold text-gray-900 mb-6">候选人列表</h2>
+                        ${p.candidates.length === 0 ?
+                            '<p class="text-gray-500 text-center py-8 text-lg">暂无符合条件的候选人</p>' :
+                            `<div class="space-y-3">
+                                ${p.candidates.map(cand => `
+                                    <div class="flex items-center justify-between p-5 border-2 border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition cursor-pointer"
+                                         onclick="getCandidateDetail(${cand.candidate_id})">
+                                        <div class="flex-1">
+                                            <h3 class="font-bold text-gray-900 text-lg">${cand.name}</h3>
+                                            <p class="text-sm text-gray-600 mt-2">${cand.evaluation_reason}</p>
+                                        </div>
+                                        <span class="ml-4 px-4 py-2 rounded-full text-sm font-bold
+                                            ${cand.grade === 'A' ? 'bg-green-100 text-green-800' :
+                                              cand.grade === 'B' ? 'bg-blue-100 text-blue-800' :
+                                              cand.grade === 'C' ? 'bg-yellow-100 text-yellow-800' :
+                                              'bg-red-100 text-red-800'}">
+                                            ${cand.grade}级 - ${cand.score}分
+                                        </span>
+                                    </div>
+                                `).join('')}
+                            </div>`
+                        }
+                    </div>
+                </div>
+            `;
+        }
+
+        // ==================== 查询结果页 ====================
+
+        function QueryResultPage() {
+            const result = appState.queryResult;
+            return `
+                <div class="max-w-4xl mx-auto px-4 py-8">
+                    <div class="flex items-center gap-4 mb-8">
+                        <button onclick="appState.currentPage='queryPage'; render();" class="text-blue-600 hover:text-blue-800 text-2xl">
+                            <i class="fas fa-arrow-left"></i>
+                        </button>
+                        <h2 class="text-3xl font-bold text-gray-900">查询结果</h2>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow p-8 mb-6">
+                        <p class="text-gray-600 mb-3">您的查询：</p>
+                        <p class="text-xl text-gray-900 italic font-semibold mb-6">"${result.query}"</p>
+
+                        ${result.summary ?
+                            `<div class="p-6 bg-gradient-to-r from-purple-50 to-indigo-50 border-l-4 border-purple-600 rounded-lg">
+                                <p class="text-gray-900 font-bold mb-3">🤖 AI 分析结果：</p>
+                                <p class="text-gray-700 leading-relaxed">${result.summary}</p>
+                            </div>` : ''
+                        }
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow p-8">
+                        <h2 class="text-2xl font-bold text-gray-900 mb-6">详细数据</h2>
+                        ${result.results.length === 0 ?
+                            '<p class="text-gray-500 text-center py-8 text-lg">未找到匹配结果</p>' :
+                            `<div class="space-y-3">
+                                ${result.results.map(item => `
+                                    <div class="p-4 border-2 border-gray-200 rounded-lg hover:bg-blue-50 transition">
+                                        <p class="font-bold text-gray-900">${item.candidate_name || item.metric || item.position_name || '数据项'}</p>
+                                        <div class="flex gap-4 mt-2 text-sm text-gray-600">
+                                            ${item.score ? `<span>评分: <strong class="text-gray-900">${item.score}</strong></span>` : ''}
+                                            ${item.grade ? `<span>等级: <strong class="text-gray-900">${item.grade}</strong></span>` : ''}
+                                            ${item.value ? `<span>数值: <strong class="text-gray-900">${item.value}</strong></span>` : ''}
+                                            ${item.email ? `<span>邮箱: <strong class="text-gray-900">${item.email}</strong></span>` : ''}
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>`
+                        }
+                    </div>
+                </div>
+            `;
+        }
+
+        // ==================== 主渲染函数 ====================
+
+        function render() {
+            let content;
+            switch(appState.currentPage) {
+                case 'uploadResume': content = UploadResumePage(); break;
+                case 'createPosition': content = CreatePositionPage(); break;
+                case 'queryPage': content = QueryPage(); break;
+                case 'candidates': content = CandidatesPage(); break;
+                case 'candidateDetail': content = CandidateDetailPage(); break;
+                case 'positionDetail': content = PositionDetailPage(); break;
+                case 'queryResult': content = QueryResultPage(); break;
+                default: content = DashboardPage();
+            }
+
+            document.getElementById('app').innerHTML = TopBar() + MessageBox() + content;
+        }
+
+        // ==================== 初始化 ====================
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchPositions();
+            fetchCandidates();
+            render();
+        });
+    </script>
+</body>
+</html>
