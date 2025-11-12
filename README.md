@@ -1,61 +1,87 @@
-# 智能招聘助手系统 v1.0 - LangGraph版本
+# 智能招聘Agent系统 v2.0 - 对话式招聘助手
 
-基于LangGraph多工作流编排的智能简历分析和岗位匹配系统。该系统使用Claude LLM进行结构化信息提取、求职意向分析、岗位智能匹配和自然语言查询处理。
+基于LangGraph ReAct模式的智能招聘管理系统。该系统通过自然语言对话完成简历处理、岗位管理、候选人匹配等全流程招聘工作，同时提供传统API接口和Web聊天界面。
 
 ## 🎯 核心特性
 
-### 智能简历处理
-- **PDF智能解析**：使用pdfplumber提取简历文本
-- **结构化信息提取**：通过Claude LLM提取姓名、技能、工作经历、教育背景等
-- **提取质量评分**：自动评估提取内容的完整度（0-100分）
-- **候选人版本控制**：保存每次上传的简历版本
+### 🤖 Agent智能决策
+- **自然语言交互**：通过对话完成所有招聘操作，无需记忆API端点
+- **自主规划执行**：Agent自动理解意图、规划步骤、选择工具
+- **多轮对话支持**：记住对话上下文，支持连续交互
+- **智能建议**：提供专业的招聘分析和决策建议
 
-### 多维度岗位匹配
-- **绝对评分制**：统一60分基线，0-100分四级评价体系（A/B/C/D）
-- **LLM深度评估**：基于岗位需求进行详细评分，包含理由和差距分析
-- **动态重新分配**：新增岗位自动触发匹配评估
-- **求职意向三层处理**：
-  1. 有明确意向 + 岗位存在 → 岗位匹配后不再改动
-  2. 有明确意向 + 岗位不存在 → 临时分配最优，若期待的岗位创建，成为状态1，否则随着状态3不断重新评估
-  3. 无明确意向 → 自动分配最优，新岗位时重新评估
+### 📋 完整CRUD能力
+- **简历处理**：上传PDF简历、自动提取信息、智能评分匹配
+- **岗位管理**：创建岗位、分析要求、自动重新分配候选人
+- **候选人管理**：查询、筛选、评估、调整岗位分配
+- **数据分析**：实时统计、多维度查询、智能推荐
 
-### LangGraph工作流编排
-系统包含3个完整的LangGraph工作流，支持状态管理、错误处理和可观测性：
+### 🛠️ 9个Agent工具
+1. **upload_resume** - 上传并处理简历
+2. **create_position** - 创建新岗位
+3. **list_positions** - 列出所有岗位
+4. **get_position_stats** - 获取岗位统计
+5. **search_candidates** - 搜索候选人（支持多维度筛选）
+6. **get_candidate_detail** - 获取候选人详情
+7. **get_position_candidates** - 查看岗位候选人列表
+8. **evaluate_candidate** - 重新评估匹配度
+9. **update_candidate_position** - 调整岗位分配
 
-1. **简历处理工作流** - 7步处理流程
-2. **岗位分析工作流** - 3步创建和分配流程
-3. **自然语言查询工作流** - 3步查询处理流程
+### 🎨 多种使用方式
+- **Web聊天界面**：美观的对话式交互界面
+- **CLI命令行**：终端交互模式，支持文件上传
+- **REST API**：完整的API接口，支持程序化调用
+- **混合使用**：可与原工作流系统并存使用
 
-### 完整的审计追踪
-- **操作日志**：记录所有系统操作（创建、更新、删除）
-- **分配历史**：追踪每次岗位分配的变化和原因
-- **版本历史**：保存候选人简历版本
+## 📊 系统架构
 
-## 📋 系统架构
+### 双系统架构
+
+```
+┌─────────────────────────────────────────────────────┐
+│  工作流系统 (main_langgraph.py) - 端口8000          │
+│  ├─ 可视化Web界面                                    │
+│  ├─ 预定义工作流                                    │
+│  └─ 适合：批量操作、日常HR工作                       │
+└─────────────────────────────────────────────────────┘
+                      ↕ (共享数据库)
+┌─────────────────────────────────────────────────────┐
+│  Agent系统 (agent_main.py) - 端口8001               │
+│  ├─ 对话式聊天界面                                   │
+│  ├─ 智能决策引擎                                    │
+│  └─ 适合：复杂查询、智能分析、灵活操作               │
+└─────────────────────────────────────────────────────┘
+```
 
 ### 文件结构
+
 ```
 recruitment_system/
-├── main_langgraph.py          # FastAPI主应用 + 所有API端点
+├── agent_main.py              # Agent主程序（新增）⭐
+├── agent_tools.py             # Agent工具定义（新增）⭐
+├── agent_state.py             # 工作流状态定义
+├── agent_nodes.py             # 工作流节点实现
+├── agent_workflows.py         # LangGraph工作流定义
+│
+├── main_langgraph.py          # 工作流系统主应用
 ├── llm_service.py             # Claude LLM集成服务
 ├── service.py                 # 核心业务逻辑
 ├── models.py                  # SQLAlchemy数据库模型
 ├── schemas.py                 # Pydantic数据验证模型
 ├── pdf_processor.py           # PDF文本提取模块
-├── agent_workflows.py         # LangGraph工作流定义
-├── agent_nodes.py             # 工作流节点实现
-├── agent_state.py             # 工作流状态定义
+│
+├── frontend/                  # 前端文件（推荐）⭐
+│   ├── agent_chat_ui.html    # Agent聊天界面（新增）
+│   └── index.html            # 工作流界面（原有）
+│
 ├── requirements.txt           # Python依赖
 ├── .env                       # 环境配置（需创建）
-├── .env.example               # 环境配置示例
-├── Dockerfile                 # Docker镜像构建
-├── docker-compose.yml         # Docker服务编排
-├── start.sh                   # 启动脚本
-├── index.html                 # 前端界面（可选）
-└── recruitment.db             # SQLite数据库（本地开发）
+├── .env.example              # 环境配置示例
+└── recruitment.db            # SQLite数据库（本地开发）
 ```
 
 ### 数据库架构
+
 ```
 candidates                      # 候选人表
 ├── candidate_id (PK)
@@ -73,7 +99,7 @@ positions                       # 岗位表
 ├── required_skills (JSON)
 ├── nice_to_have (JSON)
 ├── evaluation_prompt
-└── 统计字段
+└── 统计字段（实时查询）
 
 candidate_position_match       # 匹配评分表
 ├── match_id (PK)
@@ -83,550 +109,460 @@ candidate_position_match       # 匹配评分表
 └── grade (A/B/C/D)
 
 position_allocation_history    # 分配历史
-├── history_id (PK)
-├── 旧岗位、新岗位、分数变化
-└── 触发事件类型
-
 audit_log                       # 审计日志
-├── 操作者、操作类型
-└── 详细信息
-
 candidate_version              # 候选人版本控制
-├── 每次上传的快照
-└── 上传时间
 ```
 
 ## 🚀 快速开始
 
 ### 前置要求
-- Python 3.9+
+
+- Python 3.9+ （开发环境：3.11）
 - 有效的Claude API密钥
-- PostgreSQL数据库（可选，默认SQLite，测试开发也是以本地数据库sqlite版本开发的，PostgreSQL数据库的代码以开发并且以注释形式表示，不过从未验证过）
+- SQLite（默认）或PostgreSQL
 
 ### 1. 环境准备
 
 ```bash
-# 克隆或下载项目
+# 克隆项目
 cd recruitment_system
 
-# 复制环境文件
-cp .env.example .env
-
-# 编辑 .env 文件配置
-nano .env
-# 需要配置：
-# - DATABASE_URL: 数据库连接字符串
-# - ANTHROPIC_API_KEY: Claude API密钥
-```
-
-### 2. 安装依赖
-
-```bash
 # 创建虚拟环境（推荐）
-python3 -m venv venv
-source venv/bin/activate  # Linux/Mac
-# 或
-venv\Scripts\activate  # Windows
+python -m venv .venv
+source .venv/bin/activate  # Linux/Mac
+.venv\Scripts\activate     # Windows
 
 # 安装依赖
 pip install -r requirements.txt
+
+# 配置环境变量
+cp .env.example .env
+# 编辑 .env 文件，配置：
+# DATABASE_URL=sqlite:///recruitment.db
+# ANTHROPIC_API_KEY=sk-ant-xxxxx
 ```
 
-### 3. 启动应用
+### 2. 启动Agent系统
+
+#### 方式1：Web界面模式（推荐）
 
 ```bash
-# 方式1：使用启动脚本（推荐）
-chmod +x start.sh
-./start.sh
+# 启动Agent API服务
+python agent_main.py api
 
-# 方式2：手动启动
+# 浏览器访问
+http://localhost:8001/
+```
+
+#### 方式2：命令行交互模式
+
+```bash
+# 启动CLI模式
+python agent_main.py
+
+# 开始对话
+👤 你: 列出所有岗位
+🤖 Agent: [显示结果...]
+
+# 上传简历
+👤 你: upload resume.pdf
+```
+
+#### 方式3：同时运行两套系统
+
+```bash
+# Terminal 1: 工作流系统
 python main_langgraph.py
+# → http://localhost:8000/
 
-# 方式3：使用Uvicorn
-uvicorn main_langgraph:app --reload --host 0.0.0.0 --port 8000
+# Terminal 2: Agent系统
+python agent_main.py api
+# → http://localhost:8001/
 ```
 
-### 4. 访问应用
+### 3. 首次使用
 
-```
-🌐 API文档（Swagger UI）: http://localhost:8000/docs
-📊 健康检查: http://localhost:8000/api/health
-🎨 前端界面（如有）: http://localhost:8000/ui
-```
-
-## 📡 API 使用指南
-
-### 1. 健康检查
 ```bash
-curl http://localhost:8000/api/health
+# 1. 创建第一个岗位（必须）
+# 在Agent界面输入：
+👤 你: 创建一个Python后端工程师岗位，要求3年以上经验，熟悉Django和FastAPI
+
+# 2. 上传简历
+# 点击 📎 按钮选择PDF文件，或CLI中：
+👤 你: upload candidate_resume.pdf
+
+# 3. 查询匹配
+👤 你: Python岗位有哪些候选人？
 ```
 
-**响应示例**：
-```json
-{
-  "status": "healthy",
-  "database": "connected",
-  "positions": 3,
-  "candidates": 15,
-  "system_ready": true
-}
+## 💬 Agent使用指南
+
+### 对话示例
+
+#### 示例1：查询信息
+
+```
+👤 你: 列出所有岗位
+🤖 Agent: 共找到 9 个岗位：
+         1. Python后端工程师 (3个候选人)
+         2. Java后端开发 (3个候选人)
+         ...
+
+👤 你: Python岗位有多少人？
+🤖 Agent: Python后端工程师岗位目前有3个候选人...
+
+👤 你: 给我看分数最高的
+🤖 Agent: 根据评分，张三（85分）是Python岗位评分最高的候选人...
 ```
 
-### 2. 创建岗位
+#### 示例2：复杂分析
+
+```
+👤 你: 帮我分析一下Python岗位的候选人质量，给我一些招聘建议
+🤖 Agent: [自动调用多个工具]
+         1. 查询岗位信息
+         2. 获取所有候选人
+         3. 分析评分分布
+         4. 生成专业建议
+
+         分析结果：...
+         招聘建议：...
+```
+
+#### 示例3：上传和查询
+
+```
+👤 你: upload candidate_resume.pdf
+🤖 Agent: ✅ 简历处理成功！
+         候选人：李四
+         分配岗位：Python后端工程师（78分）
+
+👤 你: 这个候选人的详细信息
+🤖 Agent: [显示完整信息]
+
+👤 你: 他适合哪些岗位？
+🤖 Agent: [展示所有岗位的评分]
+```
+
+### CLI命令
+
 ```bash
-curl -X POST "http://localhost:8000/api/positions" \
+help        # 查看帮助
+tools       # 列出所有工具
+upload <文件路径>  # 上传简历
+clear       # 清空对话历史
+quit        # 退出程序
+```
+
+### Web界面功能
+
+- **📎 文件上传**：点击按钮上传PDF简历
+- **💬 对话交互**：输入框发送消息
+- **⚡ 快捷按钮**：常用操作一键触发
+- **🔄 清空对话**：清除历史记录
+- **❓ 帮助说明**：查看使用指南
+
+## 🔧 API接口文档
+
+### Agent API（端口8001）
+
+#### 1. 对话接口
+
+```bash
+curl -X POST "http://localhost:8001/chat" \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "Python后端工程师",
-    "description": "负责API开发、数据库设计、系统架构...",
-    "required_skills": ["Python 3年+", "Web框架", "SQL"],
-    "nice_to_have": ["分布式系统", "开源贡献"]
+    "message": "列出所有岗位",
+    "thread_id": "user_session_1"
   }'
 ```
 
-**响应示例**：
+**响应**：
 ```json
 {
-  "status": "success",
-  "position_id": 1,
-  "position_name": "Python后端工程师",
-  "reallocation_result": {
-    "total_candidates_scanned": 0,
-    "candidates_reallocated": 0,
-    "changes": []
-  }
+  "response": "共找到9个岗位：\n1. Python后端工程师...",
+  "thread_id": "user_session_1"
 }
 ```
 
-### 3. 上传简历
+#### 2. 上传简历
+
 ```bash
-curl -X POST "http://localhost:8000/api/candidates/upload" \
+curl -X POST "http://localhost:8001/upload" \
   -F "file=@resume.pdf"
 ```
 
-**响应示例**：
+**响应**：
 ```json
 {
   "status": "success",
-  "candidate_id": 1,
-  "name": "张三",
-  "age": 28,
-  "email": "zhangsan@example.com",
-  "auto_matched_position": "Python后端工程师",
-  "auto_matched_position_score": 85,
-  "is_position_locked": true,
-  "no_matched_position": false,
-  "extraction_quality": 92.5
+  "filename": "resume.pdf",
+  "data": {
+    "candidate_id": 4,
+    "name": "张三",
+    "auto_matched_position": "Python后端工程师",
+    "auto_matched_position_score": 85
+  },
+  "message": "简历处理成功：张三"
 }
 ```
 
-### 4. 获取候选人详情
+#### 3. 查看工具列表
+
 ```bash
-curl "http://localhost:8000/api/candidates/1"
+curl "http://localhost:8001/tools"
 ```
 
-**响应示例**：
+#### 4. 健康检查
+
+```bash
+curl "http://localhost:8001/health"
+```
+
+**响应**：
 ```json
 {
-  "candidate_id": 1,
-  "name": "张三",
-  "age": 28,
-  "auto_matched_position": "Python后端工程师",
-  "auto_matched_position_score": 85,
-  "is_position_locked": true,
-  "positions": [
-    {
-      "position_name": "Python后端工程师",
-      "score": 85,
-      "grade": "B",
-      "evaluation_reason": "5年Python经验，框架熟悉，缺少分布式经验"
-    }
-  ]
+  "status": "healthy",
+  "agent_ready": true,
+  "version": "2.0.0",
+  "features": ["chat", "upload", "tools"]
 }
 ```
 
-### 5. 列表查询候选人
-```bash
-curl "http://localhost:8000/api/candidates?skip=0&limit=20"
-```
+### 工作流API（端口8000）
 
-### 6. 查看岗位的候选人
-```bash
-curl "http://localhost:8000/api/positions/1/candidates?min_grade=C"
-```
+保持原有API不变，详见工作流系统文档。
 
-**响应示例**：
-```json
-{
-  "position_id": 1,
-  "position_name": "Python后端工程师",
-  "total_candidates": 3,
-  "candidates": [
-    {
-      "candidate_id": 1,
-      "name": "张三",
-      "score": 85,
-      "grade": "B",
-      "email": "zhangsan@example.com"
-    }
-  ]
-}
-```
+## 🎯 使用场景对比
 
-### 7. 自然语言查询
-```bash
-curl -X POST "http://localhost:8000/api/query" \
-  -H "Content-Type: application/json" \
-  -d '{"query": "找出Python岗位的所有B级候选人"}'
-```
+| 场景 | 推荐系统 | 原因 |
+|-----|---------|------|
+| 快速查询信息 | Agent (8001) | 自然语言，无需记API |
+| 单个简历处理 | Agent (8001) | 对话式，更便捷 |
+| 批量上传100份简历 | 工作流 (8000) | Web界面，批量操作 |
+| 复杂数据分析 | Agent (8001) | 智能决策，深度分析 |
+| 查看数据表格 | 工作流 (8000) | 可视化界面 |
+| 获取招聘建议 | Agent (8001) | 智能分析能力 |
+| 日常HR操作 | 两者都可 | 根据个人习惯 |
 
-**响应示例**：
-```json
-{
-  "query": "找出Python岗位的所有B级候选人",
-  "total": 2,
-  "results": [
-    {
-      "candidate_name": "张三",
-      "score": 85,
-      "grade": "B",
-      "email": "zhangsan@example.com"
-    }
-  ],
-  "summary": "Python开发岗位目前有2个B级候选人..."
-}
-```
+## 🔄 Agent工作原理
 
-## 🔄 三大核心工作流
-
-### 工作流1：简历处理工作流（ResumeProcessingWorkflow）
+### ReAct模式
 
 ```
-START
-  ↓
-[1] extract_info - 提取候选人结构化信息
-    ├─ PDF → 文本
-    ├─ 信息抽取 (Claude LLM)
-    ├─ 结构化输出 (JSON Schema)
-    └─ 质量评分
-  ↓
-[2] analyze_intention - 分析求职意向
-    ├─ 是否有明确意向？
-    ├─ 意向岗位是什么？
-    └─ 信息来源在哪？
-  ↓
-[3] evaluate_positions - 对所有岗位评分
-    ├─ 遍历所有活跃岗位
-    ├─ LLM逐一评分
-    ├─ 输出：0-100分 + A/B/C/D等级
-    └─ 并发处理提高性能
-  ↓
-[4] make_allocation_decision - 做出分配决策
-    ├─ 情况1：有意向 + 岗位存在
-    │  └─ is_locked=TRUE (永不改)
-    ├─ 情况2：有意向 + 岗位不存在
-    │  └─ no_matched=TRUE (等待)
-    └─ 情况3：无意向
-       └─ 自动分配最优
-  ↓
-[5] save_to_database - 保存数据
-    ├─ Candidate记录
-    ├─ CandidatePositionMatch评分
-    ├─ CandidateVersion版本
-    └─ AuditLog操作记录
-  ↓
-END (返回processing_result)
+用户输入：帮我找Python岗位分数最高的候选人
+
+Agent思考过程：
+┌─────────────────────────────────────┐
+│ Step 1: 理解意图                     │
+│ 需要：1) 找到Python岗位              │
+│       2) 获取该岗位候选人            │
+│       3) 按分数排序                  │
+└─────────────────────────────────────┘
+         ↓
+┌─────────────────────────────────────┐
+│ Step 2: 选择工具                     │
+│ 决定使用：get_position_candidates    │
+└─────────────────────────────────────┘
+         ↓
+┌─────────────────────────────────────┐
+│ Step 3: 执行工具                     │
+│ 调用工具并获取数据                    │
+└─────────────────────────────────────┘
+         ↓
+┌─────────────────────────────────────┐
+│ Step 4: 分析结果                     │
+│ 找出分数最高的候选人                  │
+└─────────────────────────────────────┘
+         ↓
+┌─────────────────────────────────────┐
+│ Step 5: 生成回答                     │
+│ 格式化输出，包含详细信息              │
+└─────────────────────────────────────┘
 ```
 
-**状态输出**：`ResumeProcessState`包含：
-- extracted_info：候选人信息
-- job_intention：求职意向
-- evaluations：所有岗位评分
-- allocation_decision：最终分配
-- candidate_id：数据库ID
+### 工具自动选择
 
-### 工作流2：岗位分析工作流（PositionAnalysisWorkflow）
+Agent会根据任务自动选择和组合工具：
 
-```
-START
-  ↓
-[1] analyze_position - 分析岗位需求
-    ├─ LLM读取岗位描述
-    ├─ 提炼核心需求技能
-    ├─ 识别加分项（nice_to_have）
-    └─ 生成评分指南（evaluation_prompt）
-  ↓
-[2] create_position - 创建岗位
-    └─ 插入Position表 → position_id
-  ↓
-[3] reallocate_candidates - 自动重新分配
-    ├─ 扫描所有候选人
-    ├─ 【情况1】有意向 + 已锁定 → SKIP
-    ├─ 【情况2】有意向 + 未锁定 + no_matched
-    │  ├─ LLM判断是否匹配
-    │  ├─ YES → 更新 + 锁定 + 记录变化
-    │  └─ NO → SKIP
-    └─ 【情况3】无意向
-       ├─ 计算新岗位分数
-       ├─ 比较旧分数
-       ├─ 更高则更新
-       └─ 记录变化
-  ↓
-END (返回reallocation_result)
-```
-
-**状态输出**：`PositionAnalysisState`包含：
-- position_id：创建的岗位ID
-- reallocation_changes：所有分配变化
-- summary：变化统计
-
-### 工作流3：自然语言查询工作流（QueryWorkflow）
-
-```
-START
-  ↓
-[1] understand_query - 理解查询意图
-    ├─ LLM分析查询内容
-    ├─ 识别查询类型
-    │  ├─ position_candidates：某岗位的候选人
-    │  ├─ candidate_positions：某候选人的岗位评分
-    │  └─ statistics：统计查询
-    └─ 转化为结构化参数
-  ↓
-[2] execute_query - 执行数据库查询
-    ├─ 根据params类型执行不同查询
-    ├─ 支持分页和过滤
-    └─ 返回结果集
-  ↓
-[3] generate_summary - 生成结果总结
-    ├─ LLM读取查询结果
-    ├─ 生成人类可读总结
-    └─ 提供推荐建议
-  ↓
-END (返回query_result)
-```
-
-**状态输出**：`QueryState`包含：
-- query_type：识别的查询类型
-- query_results：查询结果数据
-- summary：LLM生成的总结
-
-## 🛠️ Docker部署
-
-### 使用Docker Compose（推荐）
-
-```bash
-# 1. 编辑 .env 配置文件
-nano .env
-
-# 2. 启动所有服务（PostgreSQL + 应用）
-docker-compose up -d
-
-# 3. 查看日志
-docker-compose logs -f app
-
-# 4. 停止服务
-docker-compose down
-```
-
-### 单独使用Docker
-
-```bash
-# 1. 构建镜像
-docker build -t recruitment-system:1.0 .
-
-# 2. 运行容器（需要外部PostgreSQL）
-docker run -d \
-  -p 8000:8000 \
-  -e DATABASE_URL="postgresql://user:pass@host:5432/db" \
-  -e ANTHROPIC_API_KEY="sk-ant-..." \
-  --name recruitment-app \
-  recruitment-system:1.0
-
-# 3. 查看日志
-docker logs -f recruitment-app
-```
-
-## 🔐 环境变量配置
-
-创建 `.env` 文件：
-
-```env
-# 数据库配置
-# SQLite（本地开发，无需外部数据库）
-DATABASE_URL=sqlite:///recruitment.db
-
-# 或PostgreSQL（生产环境）
-# DATABASE_URL=postgresql://user:password@localhost:5432/recruitment_db
-
-# Claude API配置
-ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxx
-
-# 应用配置
-ENV=development
-DEBUG=True
-LOG_LEVEL=INFO
-PORT=8000
-HOST=0.0.0.0
-```
-
-### 获取API密钥
-
-1. 访问 https://console.anthropic.com
-2. 创建或选择项目
-3. 生成API密钥
-4. 复制到 `.env` 文件
-
-## 📊 性能优化建议
-
-### 1. 数据库优化
 ```python
-# 为常用查询字段添加索引
-# 在models.py中添加
-name = Column(String(100), nullable=False, index=True)
-auto_matched_position = Column(String(100), nullable=True, index=True)
-has_explicit_position = Column(Boolean, default=False, index=True)
+# 简单查询 → 1个工具
+"列出岗位" → list_positions()
+
+# 中等复杂 → 2-3个工具
+"Python岗位有多少人？" → 
+    list_positions() → get_position_candidates()
+
+# 复杂任务 → 5+个工具
+"给我Python岗位最好的3个候选人的详细信息" →
+    list_positions() → get_position_candidates() →
+    排序 → get_candidate_detail() × 3
 ```
 
-### 2. LLM调用优化
-- 实现请求缓存避免重复评分
-- 并发处理多个岗位评分
-- 设置API超时和重试机制
+## 🛠️ 开发指南
 
-### 3. 异步处理
-- 使用Celery处理大量简历上传
-- 后台任务队列处理重新分配
-- 异步日志写入
+### 添加新工具
+
+在 `agent_tools.py` 中：
+
+```python
+def create_my_new_tool(self):
+    """创建新工具"""
+    
+    @tool
+    def my_new_tool(param: str) -> str:
+        """工具描述，Agent会看到这个"""
+        # 调用现有业务逻辑
+        result = self.service.some_method(param)
+        return format_result(result)
+    
+    return my_new_tool
+
+# 在 get_all_tools() 中注册
+def get_all_tools(self):
+    tools = [
+        # ... 现有工具
+        self.create_my_new_tool(),  # 新工具
+    ]
+    return tools
+```
+
+### 自定义Agent行为
+
+修改 `agent_main.py` 中的 `_get_system_prompt()` 方法来调整Agent的行为风格。
+
+### 前端定制
+
+编辑 `frontend/agent_chat_ui.html`：
+
+```html
+<!-- 修改主题色 -->
+<style>
+    background: linear-gradient(135deg, #your-color1 0%, #your-color2 100%);
+</style>
+
+<!-- 添加新的快捷按钮 -->
+<button class="quick-action" onclick="sendQuickMessage('你的消息')">
+    🎯 你的按钮
+</button>
+```
+
+## 📈 性能说明
+
+| 操作类型 | 响应时间 | 说明 |
+|---------|---------|------|
+| 简单查询 (1-2个工具) | 1-2秒 | 如列出岗位 |
+| 中等复杂 (3-5个工具) | 3-5秒 | 如查询并分析 |
+| 复杂任务 (5+个工具) | 5-10秒 | 如深度分析报告 |
+| PDF上传 | 5-15秒 | 取决于简历复杂度 |
 
 ## 🐛 常见问题
 
-### Q1: 系统启动报"岗位库为空"错误
-**A**: 这是正常的。系统需要至少一个岗位才能处理简历。
+### Q1: Agent Web界面打开但无法对话？
+
+**A**: 检查后端日志，确保Agent API正在运行：
 ```bash
-# 通过API创建第一个岗位
-curl -X POST "http://localhost:8000/api/positions" \
-  -H "Content-Type: application/json" \
-  -d '{"name":"测试岗位","description":"测试描述"}'
+python agent_main.py api
+# 应该看到："✓ Agent API服务启动成功"
 ```
 
-### Q2: PDF上传失败，提示"无法解析PDF"
-**A**: 检查：
-1. PDF文件是否损坏
-2. PDF文件大小是否过大（>50MB）
-3. PDF是否为真实文本，而不是扫描图片
+### Q2: 上传PDF失败？
 
-### Q3: Claude API调用超时
-**A**: 解决方案：
-1. 检查网络连接
-2. 检查API密钥是否有效
-3. 确认API配额充足
-4. 增加超时时间
+**A**: 
+1. 确保文件是PDF格式
+2. 文件大小 < 10MB
+3. 检查后端日志查看详细错误
 
-### Q4: 数据库连接失败
-**A**: 检查清单：
-```bash
-# PostgreSQL连接
-psql postgresql://user:password@localhost:5432/recruitment_db
+### Q3: Agent说找不到岗位？
 
-# 或查看连接字符串
-echo $DATABASE_URL
-
-# SQLite查看文件
-ls -lah recruitment.db
+**A**: 需要先创建至少一个岗位：
+```
+👤 你: 创建一个Python工程师岗位，要求3年经验
 ```
 
-### Q5: 同一个候选人上传多份简历会怎样？
-**A**: 系统会：
-1. 创建新的Candidate记录（不同的candidate_id）
-2. 保存到CandidateVersion表记录版本历史
-3. 重新评估所有岗位
+### Q4: 如何重置数据库？
 
-### Q6: 如何重置所有数据？
 **A**: 
 ```bash
-# 方式1：删除数据库文件（SQLite）
 rm recruitment.db
-
-# 方式2：重新创建数据库
-python -c "from models import init_db; init_db('sqlite:///recruitment.db')"
-
-# 方式3：清空PostgreSQL数据库
-dropdb recruitment_db
-createdb recruitment_db
+python agent_main.py api
+# 会自动创建新数据库
 ```
 
-## 📈 系统扩展
+### Q5: 能同时使用Agent和工作流系统吗？
 
-### 后续开发方向
+**A**: 可以！两个系统共享同一数据库，可以同时运行：
+```bash
+# Terminal 1
+python main_langgraph.py  # 端口8000
 
-- [ ] **集成消息队列** - 使用Celery+Redis处理异步任务
-- [ ] **缓存层** - Redis缓存热点查询和LLM结果
-- [ ] **向量数据库** - pgvector支持向量相似度搜索
-- [ ] **高级分析** - 候选人潜力评估、薪资预测
-- [ ] **多语言支持** - 支持中英文混合简历
-- [ ] **背景调查集成** - 与第三方API集成
-- [ ] **推荐系统** - 智能推荐最优匹配
-- [ ] **报表导出** - 生成招聘数据报告
-- [ ] **权限管理** - 添加用户和角色系统
-- [ ] **前端完善** - React/Vue完整前端界面
-
-### 模块扩展示例
-
-```python
-# 添加新的LLM方法
-class LLMService:
-    def estimate_candidate_salary(self, candidate_info):
-        """估计候选人薪资范围"""
-        pass
-    
-    def generate_interview_questions(self, position, candidate):
-        """为特定候选人生成面试题"""
-        pass
-
-# 添加新的工作流
-class AdvancedWorkflows:
-    def build_matching_workflow(self):
-        """智能匹配工作流"""
-        pass
-    
-    def build_offer_workflow(self):
-        """offer生成工作流"""
-        pass
+# Terminal 2  
+python agent_main.py api  # 端口8001
 ```
 
-## 📚 项目学习路径
+## 📊 诊断工具
 
-推荐按此顺序阅读代码以理解系统设计：
+### 数据库诊断
 
-1. **models.py** - 了解数据结构和关键字段
-2. **schemas.py** - 了解API数据格式和验证
-3. **agent_state.py** - 了解LangGraph状态定义
-4. **agent_workflows.py** - 了解工作流编排
-5. **agent_nodes.py** - 了解节点实现细节
-6. **llm_service.py** - 了解LLM集成
-7. **service.py** - 了解业务逻辑
-8. **main_langgraph.py** - 了解API端点
+```bash
+python diagnose_db.py
+```
 
-## 🤝 贡献指南
+输出：
+- 候选人数量和详情
+- 岗位数量和统计
+- 匹配记录
+- 数据一致性检查
 
-欢迎提交问题和改进建议！
+### 修复统计字段
+
+```bash
+python fix_statistics.py
+```
+
+## 🔐 安全建议
+
+1. **API密钥管理**：不要提交 `.env` 到Git
+2. **访问控制**：生产环境添加身份验证
+3. **CORS配置**：限制允许的来源域名
+4. **数据备份**：定期备份数据库文件
+
+## 📚 技术栈
+
+- **LLM**: Claude Sonnet 4 (Anthropic)
+- **Agent框架**: LangGraph 0.2.76
+- **Web框架**: FastAPI
+- **数据库**: SQLAlchemy + SQLite/PostgreSQL
+- **PDF处理**: pdfplumber
+- **前端**: 原生HTML/CSS/JavaScript
+
+## 🎓 学习资源
+
+- [LangGraph文档](https://langchain-ai.github.io/langgraph)
+- [Anthropic Claude API](https://docs.anthropic.com)
+- [FastAPI文档](https://fastapi.tiangolo.com)
 
 ## 📄 许可证
 
 MIT License - 可自由使用、修改和分发
 
+## 🤝 贡献
+
+欢迎提交Issue和Pull Request！
+
 ## 📞 技术支持
 
-- 📖 **文档**：查看README.md和代码注释
-- 🐛 **问题排查**：查看常见问题部分
-- 📊 **API文档**：http://localhost:8000/docs
-- 🔗 **Claude文档**：https://docs.anthropic.com
-- 📚 **LangGraph文档**：https://langchain-ai.github.io/langgraph
+- 📖 完整文档：查看项目中的 `*.md` 文档
+- 🐛 问题排查：查看 `DEBUG_500_ERROR.md`
+- 🔧 前端配置：查看 `FRONTEND_DIRECTORY_GUIDE.md`
+- 🏗️ 架构优化：查看 `ARCHITECTURE_OPTIMIZATION.md`
 
 ---
 
-**版本**：1.0.0 LangGraph Edition  
-**最后更新**：2025年11月10日  
-**状态**：✅ 生产就绪  
-**Python版本**：3.9+  (开发环境为3.11)
-**依赖**：LangGraph 0.2.76 + LangChain 0.3.25 + FastAPI
+**版本**: v2.0.0 Agent Edition  
+**发布日期**: 2025-11-12  
+**状态**: ✅ 生产就绪  
+**Python版本**: 3.9+ (开发环境：3.11)  
+**核心依赖**: LangGraph 0.2.76 + LangChain 0.3.25 + Anthropic Claude  
+
+**🚀 立即开始**: `python agent_main.py api` → 访问 `http://localhost:8001/`

@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能招聘Agent - 对话界面</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 1200px;
+            height: 90vh;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .header-btn {
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .header-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 30px;
+            background: #f7f9fc;
+        }
+
+        .message {
+            display: flex;
+            margin-bottom: 20px;
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.user {
+            justify-content: flex-end;
+        }
+
+        .message-content {
+            max-width: 70%;
+            padding: 15px 20px;
+            border-radius: 18px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .message.user .message-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.agent .message-content {
+            background: white;
+            color: #333;
+            border: 1px solid #e0e0e0;
+            border-bottom-left-radius: 4px;
+        }
+
+        .message-time {
+            font-size: 12px;
+            color: #999;
+            margin-top: 5px;
+        }
+
+        .typing-indicator {
+            display: none;
+            padding: 15px 20px;
+            background: white;
+            border-radius: 18px;
+            border: 1px solid #e0e0e0;
+            width: fit-content;
+        }
+
+        .typing-indicator.active {
+            display: block;
+        }
+
+        .typing-indicator span {
+            height: 8px;
+            width: 8px;
+            background: #667eea;
+            border-radius: 50%;
+            display: inline-block;
+            margin: 0 2px;
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-10px); }
+        }
+
+        .input-container {
+            padding: 20px 30px;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+
+        .file-upload {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .file-upload input[type="file"] {
+            position: absolute;
+            left: -9999px;
+        }
+
+        .file-upload-btn {
+            background: #f0f0f0;
+            border: none;
+            padding: 12px 16px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 20px;
+            transition: all 0.3s;
+        }
+
+        .file-upload-btn:hover {
+            background: #e0e0e0;
+        }
+
+        .input-wrapper {
+            flex: 1;
+            position: relative;
+        }
+
+        #userInput {
+            width: 100%;
+            padding: 12px 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 15px;
+            resize: none;
+            max-height: 120px;
+            font-family: inherit;
+            transition: border-color 0.3s;
+        }
+
+        #userInput:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        #sendBtn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+
+        #sendBtn:hover {
+            transform: translateY(-2px);
+        }
+
+        #sendBtn:active {
+            transform: translateY(0);
+        }
+
+        #sendBtn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .welcome-message {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .welcome-message h2 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .quick-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .quick-action {
+            background: white;
+            border: 2px solid #667eea;
+            color: #667eea;
+            padding: 10px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .quick-action:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .file-preview {
+            display: none;
+            background: #f0f0f0;
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .file-preview.active {
+            display: flex;
+        }
+
+        .file-preview-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .file-preview-remove {
+            background: #ff4444;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 智能招聘Agent</h1>
+            <div class="header-actions">
+                <button class="header-btn" onclick="clearChat()">清空对话</button>
+                <button class="header-btn" onclick="showHelp()">帮助</button>
+            </div>
+        </div>
+
+        <div class="chat-container" id="chatContainer">
+            <div class="welcome-message">
+                <h2>👋 欢迎使用智能招聘助手</h2>
+                <p>我可以帮你管理招聘流程、分析候选人、提供专业建议</p>
+                <div class="quick-actions">
+                    <button class="quick-action" onclick="sendQuickMessage('列出所有岗位')">📋 查看岗位</button>
+                    <button class="quick-action" onclick="sendQuickMessage('有多少候选人？')">👥 候选人统计</button>
+                    <button class="quick-action" onclick="sendQuickMessage('帮我找Python岗位分数最高的候选人')">🔍 查询匹配</button>
+                    <button class="quick-action" onclick="showUploadHelp()">📤 上传简历</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="typing-indicator" id="typingIndicator">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+
+        <div class="input-container">
+            <div class="file-upload">
+                <input type="file" id="fileInput" accept=".pdf" onchange="handleFileSelect(event)">
+                <button class="file-upload-btn" onclick="document.getElementById('fileInput').click()">
+                    📎
+                </button>
+            </div>
+            <div class="input-wrapper">
+                <textarea
+                    id="userInput"
+                    placeholder="输入你的问题或选择文件上传..."
+                    rows="1"
+                    onkeydown="handleKeyPress(event)"
+                ></textarea>
+                <div class="file-preview" id="filePreview">
+                    <div class="file-preview-info">
+                        <span>📄</span>
+                        <span id="fileName"></span>
+                    </div>
+                    <button class="file-preview-remove" onclick="removeFile()">✕</button>
+                </div>
+            </div>
+            <button id="sendBtn" onclick="sendMessage()">发送</button>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8001';
+        let currentFile = null;
+        let threadId = 'web_ui_' + Date.now();
+
+        // 发送消息
+        async function sendMessage() {
+            const input = document.getElementById('userInput');
+            const message = input.value.trim();
+
+            // 如果有文件，先上传文件
+            if (currentFile) {
+                await uploadFile();
+                return;
+            }
+
+            if (!message) return;
+
+            // 显示用户消息
+            addMessage(message, 'user');
+            input.value = '';
+            input.style.height = 'auto';
+
+            // 显示输入中指示器
+            showTyping();
+
+            try {
+                const response = await fetch(`${API_BASE}/chat`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        thread_id: threadId
+                    })
+                });
+
+                const data = await response.json();
+                hideTyping();
+
+                // 显示Agent回复
+                addMessage(data.response, 'agent');
+
+            } catch (error) {
+                hideTyping();
+                addMessage('抱歉，连接Agent服务失败。请确保Agent服务正在运行（python agent_main.py api）', 'agent');
+                console.error('Error:', error);
+            }
+        }
+
+        // 上传文件
+        async function uploadFile() {
+            if (!currentFile) return;
+
+            const formData = new FormData();
+            formData.append('file', currentFile);
+
+            // 显示上传中
+            addMessage(`正在上传简历: ${currentFile.name}`, 'user');
+            showTyping();
+
+            try {
+                const response = await fetch(`${API_BASE}/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                hideTyping();
+
+                if (result.status === 'success') {
+                    const data = result.data;
+                    const message = `✅ 简历处理成功！
+
+候选人信息：
+- 姓名: ${data.name}
+- 年龄: ${data.age || '未提供'}
+- 邮箱: ${data.email || '未提供'}
+
+分配结果：
+- 分配岗位: ${data.auto_matched_position}
+- 评分: ${data.auto_matched_position_score}/100
+- 提取质量: ${data.extraction_quality?.toFixed(1) || '0'}/100`;
+
+                    addMessage(message, 'agent');
+                } else {
+                    addMessage(`❌ 上传失败: ${result.message}`, 'agent');
+                }
+
+            } catch (error) {
+                hideTyping();
+                addMessage('抱歉，上传失败。请检查文件格式和网络连接。', 'agent');
+                console.error('Error:', error);
+            } finally {
+                removeFile();
+            }
+        }
+
+        // 处理文件选择
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                if (!file.name.endsWith('.pdf')) {
+                    alert('请选择PDF格式的简历文件');
+                    return;
+                }
+                currentFile = file;
+                document.getElementById('fileName').textContent = file.name;
+                document.getElementById('filePreview').classList.add('active');
+                document.getElementById('userInput').placeholder = '点击发送上传简历，或继续输入消息...';
+            }
+        }
+
+        // 移除文件
+        function removeFile() {
+            currentFile = null;
+            document.getElementById('fileInput').value = '';
+            document.getElementById('filePreview').classList.remove('active');
+            document.getElementById('userInput').placeholder = '输入你的问题或选择文件上传...';
+        }
+
+        // 添加消息到界面
+        function addMessage(content, role) {
+            const chatContainer = document.getElementById('chatContainer');
+            const welcomeMsg = chatContainer.querySelector('.welcome-message');
+            if (welcomeMsg) {
+                welcomeMsg.remove();
+            }
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}`;
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.textContent = content;
+
+            messageDiv.appendChild(contentDiv);
+            chatContainer.appendChild(messageDiv);
+
+            // 滚动到底部
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // 显示/隐藏输入中指示器
+        function showTyping() {
+            document.getElementById('typingIndicator').classList.add('active');
+            document.getElementById('sendBtn').disabled = true;
+        }
+
+        function hideTyping() {
+            document.getElementById('typingIndicator').classList.remove('active');
+            document.getElementById('sendBtn').disabled = false;
+        }
+
+        // 快捷消息
+        function sendQuickMessage(message) {
+            document.getElementById('userInput').value = message;
+            sendMessage();
+        }
+
+        // 清空对话
+        function clearChat() {
+            if (confirm('确定要清空对话历史吗？')) {
+                document.getElementById('chatContainer').innerHTML = `
+                    <div class="welcome-message">
+                        <h2>👋 欢迎使用智能招聘助手</h2>
+                        <p>我可以帮你管理招聘流程、分析候选人、提供专业建议</p>
+                        <div class="quick-actions">
+                            <button class="quick-action" onclick="sendQuickMessage('列出所有岗位')">📋 查看岗位</button>
+                            <button class="quick-action" onclick="sendQuickMessage('有多少候选人？')">👥 候选人统计</button>
+                            <button class="quick-action" onclick="sendQuickMessage('帮我找Python岗位分数最高的候选人')">🔍 查询匹配</button>
+                            <button class="quick-action" onclick="showUploadHelp()">📤 上传简历</button>
+                        </div>
+                    </div>
+                `;
+                threadId = 'web_ui_' + Date.now();
+            }
+        }
+
+        // 显示帮助
+        function showHelp() {
+            const helpMessage = `📖 使用帮助
+
+我可以帮你完成以下任务：
+
+1️⃣ 上传简历
+   - 点击📎按钮选择PDF文件
+   - 自动提取信息并匹配岗位
+
+2️⃣ 查询信息
+   - "列出所有岗位"
+   - "有多少候选人？"
+   - "Python岗位有哪些候选人？"
+
+3️⃣ 创建管理
+   - "创建一个Java工程师岗位"
+   - "重新评估候选人1对岗位2的匹配度"
+
+4️⃣ 智能分析
+   - "谁最适合Python岗位？"
+   - "给我一些招聘建议"
+
+💡 提示：你可以用自然语言提问，我会智能理解并执行！`;
+
+            addMessage(helpMessage, 'agent');
+        }
+
+        // 显示上传帮助
+        function showUploadHelp() {
+            const helpMessage = `📤 上传简历指南
+
+1. 点击左下角的 📎 按钮
+2. 选择PDF格式的简历文件
+3. 点击"发送"按钮上传
+4. 我会自动：
+   ✓ 提取候选人信息
+   ✓ 分析求职意向
+   ✓ 对所有岗位评分
+   ✓ 自动分配最优岗位
+
+支持格式：PDF
+建议大小：< 10MB`;
+
+            addMessage(helpMessage, 'agent');
+        }
+
+        // 键盘事件
+        function handleKeyPress(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+
+        // 自动调整输入框高度
+        document.getElementById('userInput').addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+        });
+
+        // 页面加载时检查API连接
+        window.addEventListener('load', async function() {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                console.log('✅ Agent API连接成功:', data);
+            } catch (error) {
+                console.error('❌ 无法连接到Agent API，请确保已启动: python agent_main.py api');
+                addMessage('⚠️ 提示：请先启动Agent服务（python agent_main.py api）', 'agent');
+            }
+        });
+    </script>
+</body>
+</html>

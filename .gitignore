@@ -14,3 +14,6 @@ venv/
 # Others
 .DS_Store
 *.log
+
+# 环境变量文件
+.env
